@@ -9,7 +9,7 @@ mkdir:
 	mkdir -p build
 
 build:
-	clang $(CFLAGS) main.c csvparser.c -o build/main
+	gcc $(CFLAGS) main.c csvparser.c -o build/main
 
 win32:
 	$(mingw) $(CFLAGS) main.c csvparser.c -o build/main.exe

@@ -1,10 +1,6 @@
 #include "csvparser.h"
 #include <assert.h>
 
-#define _XOPEN_SOURCE 700
-#define _POSIX_C_SOURCE 200809L
-
-
 #define MAX_FIELD_SIZE 1024
 
 typedef struct CsvParser {
