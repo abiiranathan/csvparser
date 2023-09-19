@@ -1,0 +1,22 @@
+name,cash
+# This is a comment and will be ignored(hopefully :))
+Caps Amoxicillin 250mg,
+Caps Amoxicillin/Flucloxacillin 500mg,
+Caps Amoxicillin 500mg,
+Caps Ampicillin 250mg,
+# The next blank line will be ignored too
+
+
+Caps Ampicillin/Cloxacillin 250/250mg,
+Caps Azithromycin 250mg,
+Caps Azithromycin 500mg,
+Caps Azithromycin-1g/Secdinazole(Danzel kit),
+Caps Calcium Levofolinate (Teva) 100mg,
+Caps Calcium Levofolinate (Teva) 175mg,
+Caps Cefalexin 250mg,2500
+Caps Cefixime 200mg,2500
+Caps Cefixime 400mg,2500
+Caps Celecoxib 100mg,2500
+
+# The next line should be parsed.
+"Tabs Ciprofloxacin 250mg,oral", 4000

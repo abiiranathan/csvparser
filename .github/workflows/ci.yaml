@@ -1,0 +1,43 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up C/C++ environment
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang gcc-mingw-w64
+          pip install cmake
+
+      - name: Build for Linux
+        run: |
+          mkdir -p build
+          clang -Wall -Werror -pedantic -O2 -std=c11 -I. main.c csvparser.c -o build/main
+
+      - name: Build for Windows
+        run: |
+          mkdir -p build
+          /usr/bin/x86_64-w64-mingw32-gcc -Wall -Werror -pedantic -O2 -std=c11 -I. main.c csvparser.c -o build/main.exe
+
+      - name: Test on Linux
+        run: |
+          gcc -Wall -Werror -pedantic tests/test_csvparser.c csvparser.c -o build/test_main
+          ./build/test_main
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-artifacts
+          path: build

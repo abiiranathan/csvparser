@@ -1,0 +1,6 @@
+*.exe
+main
+a.out
+csvparser
+test_main
+build
