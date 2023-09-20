@@ -8,6 +8,7 @@ This library provides functions for parsing CSV (Comma-Separated Values) data. I
 - Configure delimiter, quote character, and comment character.
 - Support for skipping header rows.
 - Lightweight and easy to use.
+- Cross-platform support.
 
 ## Usage
 
@@ -38,7 +39,7 @@ int main() {
 
     // Print the first row field
     CsvRow* row = rows[0];
-    for (int i = 0; i < row->numfields; i++) {
+    for (int i = 0; i < row->numFields; i++) {
         printf("%s\n", row->fields[i][0]);
     }
 
