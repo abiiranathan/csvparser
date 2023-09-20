@@ -1,10 +1,12 @@
 #include "csvparser.h"
+#include <limits.h>
+#include <stdarg.h>
 
 typedef struct CsvParser {
   size_t num_rows;   // Number of rows in csv, excluding empty lines
   FILE* stream;      // File stream
   int fd;            // File descriptor
-  CsvRow* rows;      // Array of rows
+  CsvRow** rows;     // Array of row pointers
   char delim;        // Delimiter character
   char quote;        // Quote character
   char comment;      // Comment character
@@ -18,7 +20,7 @@ typedef struct CsvParser {
 
 // Function to duplicate a string.
 // A custom implementation of strdup.
-char* dupstr(const char* source) {
+static char* dupstr(const char* source) {
   if (source == NULL)
     return NULL;
 
@@ -30,8 +32,17 @@ char* dupstr(const char* source) {
   return duplicate;
 }
 
+// Print an error message and exit
+static void fatalf(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+  exit(EXIT_FAILURE);
+}
+
 // Function to parse a CSV line and split it into fields
-static void parseCSVLine(const char* line, size_t rowIndex, CsvRow* row, char delim, char quote) {
+static void parse_csv_line(const char* line, size_t rowIndex, CsvRow* row, char delim, char quote) {
   char field[MAX_FIELD_SIZE];
   int fieldIndex = 0;
   int insideQuotes = 0;
@@ -49,6 +60,11 @@ static void parseCSVLine(const char* line, size_t rowIndex, CsvRow* row, char de
       // Allocate memory for the field and add it to the row
       char* fieldCopy = dupstr(field);
       row->fields = realloc(row->fields, (row->numFields + 1) * sizeof(char*));
+
+      if (!row->fields) {
+        fatalf("ERROR: unable to realloc() memory for row->fields");
+      }
+
       row->fields[row->numFields] = fieldCopy;
       row->numFields++;
 
@@ -65,51 +81,45 @@ static void parseCSVLine(const char* line, size_t rowIndex, CsvRow* row, char de
   // Allocate memory for the last field and add it to the row
   char* fieldCopy = dupstr(field);
   row->fields = realloc(row->fields, (row->numFields + 1) * sizeof(char*));
-  row->fields[row->numFields] = fieldCopy;
+  if (!row->fields) {
+    fatalf("ERROR: unable to realloc() memory for row->fields");
+  }
 
+  row->fields[row->numFields] = fieldCopy;
   row->numFields++;
 
   if (row->numFields < 1) {
-    fprintf(stderr, "row %zu has no fields\n", rowIndex);
-    exit(EXIT_FAILURE);
+    fatalf("row %zu has no fields\n", rowIndex);
   }
 }
 
+// count the number of lines in a csv file.
+// ignore comments. Optionally skip header.
 static size_t line_count(CsvParser* self) {
-  // count number of lines in csv file(ignore empty lines)
   size_t lines = 0;
-
-  // Initialize prevChar to '\n' to handle the first line
   char prevChar = '\n';
-
-  // Flag to indicate whether the header has been skipped
   bool headerSkipped = false;
 
   while (!feof(self->stream)) {
     char c = fgetc(self->stream);
-
     if (c == EOF) {
-      break;  // Exit the loop when EOF is reached
+      break;
     }
 
     // Ignore comment lines
     if (c == self->comment) {
-      while ((c = fgetc(self->stream)) != EOF && c != '\n') {
-        // Read and discard characters until a newline
-        // or EOF is encountered
-      }
+      while ((c = fgetc(self->stream)) != EOF && c != '\n')
+        ;
 
       // read the new line character at end of comment line
       c = fgetc(self->stream);
-      // will terminate the loop if EOF is encountered
       continue;
     }
 
     // Skip the header line if it exists and hasn't been skipped yet
     if (self->has_header && self->skip_header && !headerSkipped && lines == 0) {
-      while ((c = fgetc(self->stream)) != EOF && c != '\n') {
-        // Read and discard characters until a newline or EOF is encountered
-      }
+      while ((c = fgetc(self->stream)) != EOF && c != '\n')
+        ;
       headerSkipped = true;
     }
 
@@ -144,7 +154,10 @@ CsvParser* csv_new_parser(int fd) {
   CsvParser* parser = malloc(sizeof(CsvParser));
 
   if (parser) {
-    FILE* stream = fdopen(fd, "r");  // convert fd to file stream with fdopen
+    // The file descriptor is not dup'ed,
+    // and will be closed when the stream created  by  fdopen()  is
+    //  closed(man fdopen).
+    FILE* stream = fdopen(fd, "r");
     if (!stream) {
       fprintf(stderr, "error opening file stream\n");
       return NULL;
@@ -162,32 +175,38 @@ CsvParser* csv_new_parser(int fd) {
     parser->skip_header = false;
     parser->lines_counted = false;
     parser->parsed = false;
+    parser->rows = NULL;
   }
 
   return parser;
 }
 
-static void csv_allocate_rows(CsvParser* self) {
-  self->num_rows = line_count(self);
-  rewind(self->stream);  // reset file pointer to beginning of file
-
-  CsvRow* rows = malloc(sizeof(CsvRow) * self->num_rows);
+// Allocate memory for rows and set num_rows.
+static void csv_allocate_rows(CsvParser* self, size_t alloc_max) {
+  CsvRow** rows = malloc(self->num_rows * sizeof(CsvRow*));
   if (!rows) {
-    fprintf(stderr, "error allocating memory for %zu rows\n", self->num_rows);
-    exit(EXIT_FAILURE);
+    fatalf("error allocating memory for %zu rows\n", self->num_rows);
+  }
+
+  for (size_t i = 0; i < self->num_rows; i++) {
+    rows[i] = malloc(sizeof(CsvRow));
+    if (!rows[i]) {
+      fatalf("error allocating memory for row %zu\n", i);
+    }
   }
   self->rows = rows;
 }
 
-CsvRow* csv_parse(CsvParser* self) {
-  // if we have already parsed the file, return the rows
+CsvRow** csv_parse(CsvParser* self) {
   if (self->parsed) {
-    return self->rows;
+    fatalf("can not call csv_parse_async() or csv_parse() more than once\n");
   }
 
   // read num_rows and allocate them on heap.
   if (!self->lines_counted) {
-    csv_allocate_rows(self);
+    self->num_rows = line_count(self);
+    rewind(self->stream);  // reset file pointer to beginning of file
+    csv_allocate_rows(self, self->num_rows);
   }
 
   char line[MAX_FIELD_SIZE];
@@ -221,47 +240,107 @@ CsvRow* csv_parse(CsvParser* self) {
       continue;
     }
 
-    parseCSVLine(line, rowIndex, &self->rows[rowIndex], self->delim, self->quote);
+    parse_csv_line(line, rowIndex, self->rows[rowIndex], self->delim, self->quote);
     rowIndex++;
   }
 
-  // don't close file stream if fd is stdin
-  if (self->fd > 0) {
-    fclose(self->stream);
+  if (self->fd > STDERR_FILENO) {
+    fclose(self->stream);  // This will close the underlying file descriptor.
   }
 
   self->parsed = true;
   return self->rows;
 }
 
+void csv_parse_async(CsvParser* self, RowCallback callback, size_t alloc_max) {
+  if (self->parsed) {
+    fatalf("can not call csv_parse_async() or csv_parse() more than once\n");
+  }
+
+  if (!self->lines_counted) {
+    self->num_rows = line_count(self);
+    rewind(self->stream);
+  }
+
+  size_t rowIndex = 0;
+  bool headerSkipped = false;
+  char line[MAX_FIELD_SIZE];
+
+  self->num_rows = (alloc_max > 0 && alloc_max < self->num_rows) ? alloc_max : self->num_rows;
+  csv_allocate_rows(self, self->num_rows);
+
+  while (fgets(line, MAX_FIELD_SIZE, self->stream) && rowIndex < self->num_rows) {
+    // trim white space from end of line and skip empty lines
+    char* end = line + strlen(line) - 1;
+    while (end > line && isspace(*end)) {
+      end--;
+    }
+
+    // If the line is empty, skip it
+    if (end == line) {
+      continue;
+    }
+
+    // Terminate the line with a null character
+    end[1] = '\0';
+
+    // skip comment lines
+    if (line[0] == self->comment) {
+      continue;
+    }
+
+    if (self->has_header && self->skip_header && rowIndex == 0 && !headerSkipped) {
+      headerSkipped = true;
+      continue;
+    }
+
+    parse_csv_line(line, rowIndex, self->rows[rowIndex], self->delim, self->quote);
+    // Pass the processed row to the caller.
+    callback(rowIndex, self->rows[rowIndex]);
+    rowIndex++;
+  }
+
+  if (self->fd > STDERR_FILENO) {
+    fclose(self->stream);  // This will close the underlying file descriptor.
+  }
+  self->parsed = true;
+}
+
 size_t csv_get_numrows(const CsvParser* self) {
   if (!self->lines_counted) {
-    fprintf(stderr, "called csv_get_numrows() before csv_parse()\n");
-    exit(EXIT_FAILURE);
+    fatalf("called csv_get_numrows() before csv_parse() or csv_parse_async()\n");
   }
   return self->num_rows;
 }
 
-static void csv_free_rows(CsvRow* rows) {
-  if (!rows)
+void static csv_free_row(CsvRow* row) {
+  if (row == NULL)
     return;
 
-  for (size_t i = 0; i < rows->numFields; i++) {
-    free(rows->fields[i]);
+
+  for (size_t i = 0; i < row->numFields; i++) {
+    free(row->fields[i]);
   }
 
-  free(rows->fields);
-  free(rows);
+  free(row->fields);
+  free(row);
+  row = NULL;
 }
 
-void csv_free_parser(CsvParser* self) {
+void csv_parser_free(CsvParser* self) {
   if (!self)
     return;
 
   if (self->rows) {
-    csv_free_rows(self->rows);
+    for (size_t i = 0; i < self->num_rows; i++) {
+      csv_free_row(self->rows[i]);
+    }
+    free(self->rows);
+    self->rows = NULL;
   }
+
   free(self);
+  self = NULL;
 }
 
 void csv_set_delim(CsvParser* self, char delim) {
@@ -282,4 +361,27 @@ void csv_set_has_header(CsvParser* self, bool has_header) {
 
 void csv_set_skip_header(CsvParser* self, bool skip_header) {
   self->skip_header = skip_header;
+}
+
+int csv_fdopen(const char* filename) {
+  int fd = -1;
+#if defined(__linux__)
+  fd = open(filename, O_RDONLY | O_EXCL);
+#elif defined(_WIN32)
+  fd = _open(filename, _O_RDONLY | _O_EXCL);
+#endif
+  return fd;
+}
+
+// Cross-platform helper to close a file descriptor.
+// Ignores stdin, stdout and stderr file descriptors.
+void csv_fdclose(int fd) {
+  // do not close stdin, stdout or stderr.
+  if (fd > STDERR_FILENO) {
+#if defined(__linux__)
+    close(fd);
+#elif defined(_WIN32)
+    _close(fd);
+#endif
+  }
 }

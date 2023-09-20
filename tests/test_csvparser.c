@@ -33,7 +33,7 @@ static void runCsvParserTestCase(const char* csvData, CsvRow* expectedRows, size
   csv_set_skip_header(parser, skipHeader);
 
   // Parse the CSV data
-  CsvRow* actualRows = csv_parse(parser);
+  CsvRow** actualRows = csv_parse(parser);
 
   // Verify the number of rows
   size_t numActualRows = csv_get_numrows(parser);
@@ -42,7 +42,7 @@ static void runCsvParserTestCase(const char* csvData, CsvRow* expectedRows, size
   } else {
     // Compare each row
     for (size_t i = 0; i < numExpectedRows; i++) {
-      if (!compareCsvRows(&expectedRows[i], &actualRows[i])) {
+      if (!compareCsvRows(&expectedRows[i], actualRows[i])) {
         printf("Test failed: Row %zu mismatch\n", i + 1);
       }
     }
@@ -50,7 +50,7 @@ static void runCsvParserTestCase(const char* csvData, CsvRow* expectedRows, size
   }
 
   // Free resources
-  csv_free_parser(parser);
+  csv_parser_free(parser);
   fclose(file);
 }
 
@@ -73,13 +73,13 @@ int main() {
   runCsvParserTestCase(csvData, expectedRows, sizeof(expectedRows) / sizeof(expectedRows[0]),
                        false);
 
-
   // test with skip header
   CsvRow expectedRows2[] = {
     {.fields = (char*[]){"Alice", "25"}, .numFields = 2},
     {.fields = (char*[]){"Bob", "30"}, .numFields = 2},
     {.fields = (char*[]){"Charlie", "35"}, .numFields = 2},
   };
+
   runCsvParserTestCase(csvData, expectedRows2, sizeof(expectedRows2) / sizeof(expectedRows2[0]),
                        true);
   return 0;

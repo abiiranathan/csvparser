@@ -18,33 +18,93 @@ To use this library, follow these steps:
 2. Create a `CsvParser` object using `csv_new_parser(int fd)` and associate it with a file descriptor.
 3. Configure parser settings (delimiter, quote character, etc.) as needed.
 4. Use `csv_parse(CsvParser* self)` to parse CSV data and retrieve rows.
-5. Manage memory with `csv_get_numrows`, `csv_free_parser`, and other functions.
-6. Use _csv_set.._ set of functions to configure the parser settings.
+5. Use `csv_parse_async(CsvParser* self, size_t max_alloc)` to process each row at a time.
+6. Manage memory with `csv_get_numrows`, `csv_parser_free`.
+7. Use **_csv_set..._** family of functions to configure the parser settings like delimiter, headers, comments, quote.
 
 ## Example
 
 ```c
+#include <stdio.h>
 #include "csvparser.h"
 
-int main() {
-    int fd = /* your file descriptor here */;
-    CsvParser* parser = csv_new_parser(fd);
+// Sample Inventory item.
+typedef struct InventoryItem {
+  char name[256];
+  size_t price;
+} Item;
 
-    // Configure parser settings if needed
-    csv_set_delim(parser, ',');
-    csv_set_quote(parser, '"');
-
-    CsvRow* rows = csv_parse(parser);
-    int numrows = csv_get_numrows(parser);
-
-    // Print the first row field
-    CsvRow* row = rows[0];
-    for (int i = 0; i < row->numFields; i++) {
-        printf("%s\n", row->fields[i][0]);
+void parseItem(CsvRow* row, Item* item) {
+  strncpy(item->name, row->fields[0], sizeof(item->name) - 1);
+  char* endptr;
+  if (strcmp(row->fields[1], "") == 0) {
+    item->price = 0;
+  } else {
+    item->price = strtoul(row->fields[1], &endptr, 10);
+    // check possible overflow or underflow and set cash to 0
+    if (endptr == row->fields[1] || *endptr != '\0' || item->price == 0) {
+      item->price = 0;
     }
-
-    // Clean up
-    csv_free_parser(parser);
-    return 0;
+  }
 }
+
+void handle_row(size_t rowIndex, CsvRow* row) {
+  Item item = {0};
+  parseItem(row, &item);
+  printf("Async Item %zu: \"%s\", %zu\n", rowIndex + 1, item.name, item.price);
+}
+
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    fprintf(stderr, "Usage: %s [CSV file]\n", argv[0]);
+    return EXIT_FAILURE;
+  }
+
+  int fd = csv_fdopen(argv[1]);
+  if (fd == -1) {
+    perror("error opening file");
+    return EXIT_FAILURE;
+  }
+
+  CsvParser* parser = csv_new_parser(fd);
+  if (!parser) {
+    fprintf(stderr, "Error creating CSV parser\n");
+    return EXIT_FAILURE;
+  }
+
+  csv_set_skip_header(parser, true);
+
+  // parse the csv data.
+  CsvRow** rows = csv_parse(parser);
+  if (!rows) {
+    fprintf(stderr, "Error parsing CSV file\n");
+    return 1;
+  }
+
+  // get number of rows
+  size_t num_rows = csv_get_numrows(parser);
+  Item items[num_rows];
+  for (size_t i = 0; i < num_rows; i++) {
+    parseItem(rows[i], &items[i]);
+  }
+
+  for (size_t i = 0; i < num_rows; i++) {
+    printf("Item %zu: \"%s\", %zu\n", i + 1, items[i].name, items[i].cash);
+  }
+
+  // pass max_alloc > 0 to read up to max_alloc.
+  // csv_parse_async(parser, handle_row, 0);
+
+  csv_parser_free(parser);
+  return 0;
+}
+
 ```
+
+## Gotchas:
+
+- Calling csv_parse more than once is not allowed.
+- We have no way to dynamically stop parsing the file without leaking memory.
+- Allocates all the rows dynamically because internal fields have to be dynamically allocated.
+
+If you have any ideas on how to improve this, feel free to send in a PR or file an issue.

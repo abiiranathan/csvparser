@@ -19,6 +19,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__linux__)
+#include <unistd.h>
+#elif defined(_WIN32)
+#include <io.h>
+#endif
 
 #ifndef MAX_FIELD_SIZE
 #define MAX_FIELD_SIZE 1024  // Maximum size of the csv line.
@@ -37,6 +42,9 @@ typedef struct CsvRow {
   size_t numFields;  ///< Number of fields in each row.
 } CsvRow;
 
+// callback to process every row as its parsed.
+typedef void (*RowCallback)(size_t rowIndex, CsvRow* row);
+
 /**
  * @brief Create a new CSV parser associated with a file descriptor.
  *
@@ -48,14 +56,33 @@ typedef struct CsvRow {
 CsvParser* csv_new_parser(int fd);
 
 /**
- * @brief Parse the CSV data and retrieve the next row.
+ * @brief Parse the CSV data and retrieve all the rows at once.
  *
- * This function parses the CSV data and returns the next row as a CsvRow structure.
+ * This function parses the CSV data and returns all the rows as an array of 
+ * CsvRow structure.
+ *
+ * The parser file descriptor and stream will automatically be closed.
+ * Note that this function allocates an array of all items on the heap
+ * that you must free with csv_parser_free.
  *
  * @param self A pointer to the CsvParser.
  * @return A pointer to the next CsvRow, or NULL if there are no more rows or an error occurs.
  */
-CsvRow* csv_parse(CsvParser* self);
+CsvRow** csv_parse(CsvParser* self);
+
+/**
+ * @brief Parse the CSV data and pass each processed row back in a callback.
+ * Return true from the callback to stop early.
+ * The parser file descriptor and stream will automatically be closed.
+ *
+ * If alloc_max is 0, the parser will allocate all rows at once;
+ * otherwise it will allocate alloc_max rows.
+ * 
+ * @param self A pointer to the CsvParser.
+ * @param alloc_max The maximum number of rows to allocate at once.
+ * @return void.
+ */
+void csv_parse_async(CsvParser* self, RowCallback callback, size_t alloc_max);
 
 /**
  * @brief Get the number of rows in the CSV data.
@@ -75,7 +102,8 @@ size_t csv_get_numrows(const CsvParser* self);
  *
  * @param self A pointer to the CsvParser.
  */
-void csv_free_parser(CsvParser* self);
+void csv_parser_free(CsvParser* self);
+
 
 /**
  * @brief Set the delimiter character for CSV fields.
@@ -118,5 +146,12 @@ void csv_set_has_header(CsvParser* self, bool has_header);
  * @param skip_header True to skip the header row, false otherwise (default is true).
  */
 void csv_set_skip_header(CsvParser* self, bool skip_header);
+
+// Cross-platform helper to open a file and return its file descriptor.
+// If the file can not be opened, it returns -1.
+int csv_fdopen(const char* filename);
+
+// Cross-platform helper to close a file descriptor.
+void csv_fdclose(int fd);
 
 #endif /* __CSV_PARSER_H__ */
