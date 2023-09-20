@@ -1,7 +1,4 @@
 #include "csvparser.h"
-#include <assert.h>
-
-#define MAX_FIELD_SIZE 1024
 
 typedef struct CsvParser {
   size_t num_rows;   // Number of rows in csv, excluding empty lines
@@ -147,15 +144,16 @@ CsvParser* csv_new_parser(int fd) {
   CsvParser* parser = malloc(sizeof(CsvParser));
 
   if (parser) {
-    parser->num_rows = 0;
     FILE* stream = fdopen(fd, "r");  // convert fd to file stream with fdopen
     if (!stream) {
       fprintf(stderr, "error opening file stream\n");
       return NULL;
     }
 
+    parser->num_rows = 0;
     parser->fd = fd;
     parser->stream = stream;
+
     // set default values
     parser->delim = ',';
     parser->quote = '"';
@@ -163,6 +161,7 @@ CsvParser* csv_new_parser(int fd) {
     parser->has_header = true;
     parser->skip_header = false;
     parser->lines_counted = false;
+    parser->parsed = false;
   }
 
   return parser;
@@ -181,6 +180,11 @@ static void csv_allocate_rows(CsvParser* self) {
 }
 
 CsvRow* csv_parse(CsvParser* self) {
+  // if we have already parsed the file, return the rows
+  if (self->parsed) {
+    return self->rows;
+  }
+
   // read num_rows and allocate them on heap.
   if (!self->lines_counted) {
     csv_allocate_rows(self);
@@ -225,6 +229,8 @@ CsvRow* csv_parse(CsvParser* self) {
   if (self->fd > 0) {
     fclose(self->stream);
   }
+
+  self->parsed = true;
   return self->rows;
 }
 

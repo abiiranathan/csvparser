@@ -8,7 +8,7 @@
 #ifndef __CSV_PARSER_H__
 #define __CSV_PARSER_H__
 
-// Macro ensures strdup is available.
+// This macro ensures fdopen strdup are available
 #define _DEFAULT_SOURCE 1
 
 #include <ctype.h>
@@ -19,6 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+#ifndef MAX_FIELD_SIZE
+#define MAX_FIELD_SIZE 1024  // Maximum size of the csv line.
+#endif
 
 /**
  * @brief Opaque structure representing a CSV parser.
