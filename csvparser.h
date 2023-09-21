@@ -154,4 +154,7 @@ int csv_fdopen(const char* filename);
 // Cross-platform helper to close a file descriptor.
 void csv_fdclose(int fd);
 
+// Custom implementation for strdup.
+char* dupstr(const char* source);
+
 #endif /* __CSV_PARSER_H__ */

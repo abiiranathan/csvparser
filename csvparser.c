@@ -20,7 +20,7 @@ typedef struct CsvParser {
 
 // Function to duplicate a string.
 // A custom implementation of strdup.
-static char* dupstr(const char* source) {
+char* dupstr(const char* source) {
   if (source == NULL)
     return NULL;
 
