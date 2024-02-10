@@ -8,6 +8,11 @@
 #ifndef __CSV_PARSER_H__
 #define __CSV_PARSER_H__
 
+// C++ compatibility
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // This macro ensures fdopen strdup are available
 #define _DEFAULT_SOURCE 1
 
@@ -156,5 +161,9 @@ void csv_fdclose(int fd);
 
 // Custom implementation for strdup.
 char* dupstr(const char* source);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __CSV_PARSER_H__ */
