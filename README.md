@@ -22,6 +22,14 @@ cd csvparser
 # Installation into your system will require root access
 ```
 
+On windows
+```bash
+
+git clone https://github.com/abiiranathan/csvparser.git
+cd csvparser
+./install.ps1
+```
+
 ## API
 
 To use this library, follow these steps:
