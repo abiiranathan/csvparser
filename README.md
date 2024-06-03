@@ -11,7 +11,40 @@ A simple CSV parser library for C.
 - Memory efficiency using arena allocation.
 - Cross-platform support.
 
-## Usage
+# Installation
+Install solidc dependencies
+```bash
+git clone https://github.com/abiiranathan/solidc.git
+cd solidc
+mkdir -p build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+Install csvparser
+```bash
+git clone https://github.com/abiiranathan/csvparser.git
+cd csvparser
+mkdir -p build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+To turn off tests
+```bash
+cmake -DBUILD_TESTING=OFF ..
+```
+
+To turn off examples
+```bash
+cmake -DBUILD_EXAMPLES=OFF ..
+```
+
+## API
 
 To use this library, follow these steps:
 
@@ -64,7 +97,7 @@ gcc -D MAX_FIELD_SIZE=2048 -D CSV_ARENA_BLOCK_SIZE=8192 -o myprogram myprogram.c
 
 ## Example
 
-See the [./main.c](./main.c) file for an example of how to use the library.
+See the [examples](./examples) directory for more examples.
 
 ```c
 #include <stdio.h>  

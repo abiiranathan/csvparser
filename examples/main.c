@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "csvparser.h"
+#include "../csvparser.h"
 
 // Sample Inventory item.
 typedef struct InventoryItem {

@@ -1,6 +1,6 @@
 // Define CSV_ARENA_BLOCK_SIZE to 200MB for the CSV parser.
 #define CSV_ARENA_BLOCK_SIZE 200 * 1024 * 1024
-#include "csvparser.h"
+#include "../csvparser.h"
 
 /*
 Year,Industry_aggregation_NZSIOC,Industry_code_NZSIOC,Industry_name_NZSIOC,Units,Variable_code,Variable_name,Variable_category,Value,Industry_code_ANZSIC06
