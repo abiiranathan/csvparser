@@ -12,36 +12,14 @@ A simple CSV parser library for C.
 - Cross-platform support.
 
 # Installation
-Install solidc dependencies
-```bash
-git clone https://github.com/abiiranathan/solidc.git
-cd solidc
-mkdir -p build
-cd build
-cmake ..
-make
-sudo make install
-```
-
-Install csvparser
 ```bash
 git clone https://github.com/abiiranathan/csvparser.git
 cd csvparser
-mkdir -p build
-cd build
-cmake ..
-make
-sudo make install
-```
 
-To turn off tests
-```bash
-cmake -DBUILD_TESTING=OFF ..
-```
+# Run the install script
+./install.sh
 
-To turn off examples
-```bash
-cmake -DBUILD_EXAMPLES=OFF ..
+# Installation into your system will require root access
 ```
 
 ## API

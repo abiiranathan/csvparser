@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(GNUInstallDirs)
 include(CTest)
@@ -23,6 +24,8 @@ if(BUILD_TESTING)
 endif()
 
 if(BUILD_EXAMPLES)
+    add_subdirectory(cmake_example)
+
     add_executable(csvparser_example examples/main.c)
     target_link_libraries(csvparser_example PRIVATE csvparser)
     target_compile_options(csvparser_example PRIVATE -Wall -Wextra -Werror -Wpedantic)
@@ -34,6 +37,41 @@ set_target_properties(csvparser PROPERTIES
         PUBLIC_HEADER csvparser.h)
 
 install(TARGETS csvparser
-        EXPORT csvparser
+        EXPORT csvparser_export
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(EXPORT csvparser_export
+        FILE csvparserTargets.cmake
+        NAMESPACE csvparser::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/csvparser)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/csvparserConfig.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/csvparser)
+
+# Generate the configuration file for the library
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/csvparserConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/csvparserConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/csvparserConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/csvparser
+)
+
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/csvparserConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/csvparser)
+
+# Generate the .pc file for pkg-config
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/csvparser.pc.in
+${CMAKE_CURRENT_BINARY_DIR}/csvparser.pc
+@ONLY)
+
+# Install the .pc file
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/csvparser.pc
+DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)

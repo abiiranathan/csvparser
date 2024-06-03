@@ -8,3 +8,4 @@ build
 *.o
 output.csv
 large_csv.csv
+solidc
