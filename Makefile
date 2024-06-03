@@ -1,21 +1,20 @@
 mingw=/usr/bin/x86_64-w64-mingw32-gcc
-CFLAGS=-Wall -Werror -pedantic -O2 -std=c11 -I.
+CFLAGS=-Wall -Werror -Wextra -pedantic -g -std=c23
+LDFLAGS=-lsolidc
 
-.PHONY: build win32 test
+.PHONY: build test
 
-all: mkdir build win32 test
+all: mkdir build test
 
 mkdir:
 	mkdir -p build
 
 build:
-	gcc $(CFLAGS) main.c csvparser.c -o build/main
-
-win32:
-	$(mingw) $(CFLAGS) main.c csvparser.c -o build/main.exe
+	gcc $(CFLAGS) large_csv.c csvparser.c -o build/main $(LDFLAGS)
+	# gcc $(CFLAGS) main.c csvparser.c -o build/main $(LDFLAGS)
 
 test:
-	gcc $(CFLAGS) tests/test_csvparser.c csvparser.c -o build/test_main
+	gcc $(CFLAGS) tests/test_csvparser.c csvparser.c -o build/test_main $(LDFLAGS)
 	./build/test_main
 
 run: build

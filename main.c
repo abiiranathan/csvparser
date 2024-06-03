@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "csvparser.h"
 
 // Sample Inventory item.
@@ -7,17 +9,21 @@ typedef struct InventoryItem {
   size_t price;
 } Item;
 
-void parseItem(CsvRow* row, Item* item) {
-  strncpy(item->name, row->fields[0], sizeof(item->name) - 1);
+unsigned long to_number(const char* str) {
   char* endptr;
-  if (strcmp(row->fields[1], "") == 0) {
-    item->price = 0;
-  } else {
-    item->price = strtoul(row->fields[1], &endptr, 10);
-    // check possible overflow or underflow and set cash to 0
-    if (endptr == row->fields[1] || *endptr != '\0' || item->price == 0) {
-      item->price = 0;
-    }
+  unsigned long n;
+  n = strtoul(str, &endptr, 10);
+  // check possible overflow or underflow and set cash to 0
+  if (endptr == str || *endptr != '\0' || n == 0) {
+    n = 0;
+  }
+  return n;
+}
+
+void parseItem(CsvRow* row, Item* item) {
+  if (row->numFields == 2) {
+    strncpy(item->name, row->fields[0], sizeof(item->name) - 1);
+    item->price = to_number(row->fields[1]);
   }
 }
 
@@ -33,40 +39,37 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  int fd = csv_fdopen(argv[1]);
-  if (fd == -1) {
-    perror("error opening file");
-    return EXIT_FAILURE;
-  }
-
-  CsvParser* parser = csv_new_parser(fd);
+  // open the file
+  const char* filename = argv[1];
+  CsvParser* parser = csvparser_new(filename);
   if (!parser) {
     fprintf(stderr, "Error creating CSV parser\n");
     return EXIT_FAILURE;
   }
 
-  csv_set_skip_header(parser, true);
+  CsvRow** rows = csvparser_parse(parser);
+  if (!rows) {
+    fprintf(stderr, "Error parsing CSV file\n");
+    return EXIT_FAILURE;
+  }
 
-  // // parse the csv data.
-  // CsvRow** rows = csv_parse(parser);
-  // if (!rows) {
-  //   fprintf(stderr, "Error parsing CSV file\n");
-  //   return 1;
-  // }
+  size_t num_rows = csvparser_numrows(parser);
+  Item* items = calloc(num_rows, sizeof(Item));
+  if (!items) {
+    fprintf(stderr, "Error allocating memory for items\n");
+    return EXIT_FAILURE;
+  }
 
-  // // get number of rows
-  // size_t num_rows = csv_get_numrows(parser);
-  // Item items[num_rows];
-  // for (size_t i = 0; i < num_rows; i++) {
-  //   parseItem(rows[i], &items[i]);
-  // }
+  for (size_t i = 0; i < num_rows; i++) {
+    parseItem(rows[i], &items[i]);
+  }
 
-  // for (size_t i = 0; i < num_rows; i++) {
-  //   printf("Item %zu: \"%s\", %zu\n", i + 1, items[i].name, items[i].cash);
-  // }
+  for (size_t i = 0; i < num_rows; i++) {
+    printf("Item %zu: \"%s\", %zu\n", i + 1, items[i].name, items[i].price);
+  }
 
-  // pass max_alloc > 0 to read up to max_alloc.
-  csv_parse_async(parser, handle_row, 0);
-  csv_parser_free(parser);
+  // csvparser_parse_async(parser, handle_row, 0);
+  csvparser_free(parser);
+  free(items);
   return 0;
 }

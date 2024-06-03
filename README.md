@@ -1,6 +1,6 @@
-# CSV Parser Library
+# csvparser
 
-This library provides functions for parsing CSV (Comma-Separated Values) data. It allows you to read and manipulate CSV files with ease.
+A simple CSV parser library for C.
 
 ## Features
 
@@ -8,6 +8,7 @@ This library provides functions for parsing CSV (Comma-Separated Values) data. I
 - Configure delimiter, quote character, and comment character.
 - Support for skipping header rows.
 - Lightweight and easy to use.
+- Memory efficiency using arena allocation.
 - Cross-platform support.
 
 ## Usage
@@ -15,96 +16,101 @@ This library provides functions for parsing CSV (Comma-Separated Values) data. I
 To use this library, follow these steps:
 
 1. Include the `csvparser.h` header in your C code.
-2. Create a `CsvParser` object using `csv_new_parser(int fd)` and associate it with a file descriptor.
+2. Create a `CsvParser` object using `csvparser_new(const char *)` and associate it with a file descriptor.
 3. Configure parser settings (delimiter, quote character, etc.) as needed.
-4. Use `csv_parse(CsvParser* self)` to parse CSV data and retrieve rows.
-5. Use `csv_parse_async(CsvParser* self, size_t max_alloc)` to process each row at a time.
-6. Manage memory with `csv_get_numrows`, `csv_parser_free`.
-7. Use **_csv_set..._** family of functions to configure the parser settings like delimiter, headers, comments, quote.
+4. Use `csvparser_parse(CsvParser* self)` to parse CSV data and retrieve rows.
+5. Use `csvparser_parse_async(CsvParser* self, RowCallback callback, size_t alloc_max)` to process each row at a time using a callback function. If `max_alloc` is set to 0, it will read all rows, otherwise, it will read up to `max_alloc` rows.
+6. Get the number of rows using `csvparser_get_numrows(CsvParser* self)`.
+7. Access the rows and fields using the `CsvRow` structure.
+8. Free the parser and rows using `csvparser_free(CsvParser* self)`.
+
+## symbols
+- `CsvParser` - The main parser object.
+- `CsvRow` - Represents a row in the CSV data.
+- `CsvConfig` - Represents the configuration settings for the parser. The default values are:
+  - `delimiter` = ','
+  - `quote` = '"'
+  - `comment` = '#'
+  - `skip_header` = true
+  - `has_header` = true
+
+You can change these settings using the macro provided in the header file. This must be done before calling `csvparser_parse`.
+
+```c
+CSV_SETCONFIG(parser, .delimiter = '\t', .comment = '!', .skip_header = false, .has_header = false);
+```
+
+Or you can set the full config using the `csvparser_setconfig` function.
+
+```c
+CsvConfig config = {
+    .delimiter = '\t',
+    .comment = '!',
+    .skip_header = false,
+    .has_header = false
+};
+csvparser_setconfig(parser, &config);
+```
+
+### Configurable macros before including the header file
+- `MAX_FIELD_SIZE` - The maximum size of a field(line) in bytes. Default is 1024.
+- `CSV_ARENA_BLOCK_SIZE` - The size of the memory block for arena allocation. Default is 4096.
+
+Pass -D option to the compiler to set these values.
+
+```bash
+gcc -D MAX_FIELD_SIZE=2048 -D CSV_ARENA_BLOCK_SIZE=8192 -o myprogram myprogram.c
+```
 
 ## Example
 
+See the [./main.c](./main.c) file for an example of how to use the library.
+
 ```c
-#include <stdio.h>
+#include <stdio.h>  
 #include "csvparser.h"
 
-// Sample Inventory item.
-typedef struct InventoryItem {
-  char name[256];
-  size_t price;
-} Item;
-
-void parseItem(CsvRow* row, Item* item) {
-  strncpy(item->name, row->fields[0], sizeof(item->name) - 1);
-  char* endptr;
-  if (strcmp(row->fields[1], "") == 0) {
-    item->price = 0;
-  } else {
-    item->price = strtoul(row->fields[1], &endptr, 10);
-    // check possible overflow or underflow and set cash to 0
-    if (endptr == row->fields[1] || *endptr != '\0' || item->price == 0) {
-      item->price = 0;
+int main() {
+    CsvParser* parser = csvparser_new("data.csv");
+    if (parser == NULL) {
+        fprintf(stderr, "Error: Unable to create parser\n");
+        return 1;
     }
-  }
-}
 
-void handle_row(size_t rowIndex, CsvRow* row) {
-  Item item = {0};
-  parseItem(row, &item);
-  printf("Async Item %zu: \"%s\", %zu\n", rowIndex + 1, item.name, item.price);
-}
+    CSV_SETCONFIG(parser, .delimiter = '\t', .comment = '!', .skip_header = false, .has_header = false);
 
-int main(int argc, char** argv) {
-  if (argc < 2) {
-    fprintf(stderr, "Usage: %s [CSV file]\n", argv[0]);
-    return EXIT_FAILURE;
-  }
+    CsvRow ** rows = csvparser_parse(parser);
+    if (rows == NULL) {
+        fprintf(stderr, "Error: Unable to parse CSV data\n");
+        csvparser_free(parser);
+        return 1;
+    }
 
-  int fd = csv_fdopen(argv[1]);
-  if (fd == -1) {
-    perror("error opening file");
-    return EXIT_FAILURE;
-  }
+    size_t numrows = csvparser_get_numrows(parser);
+    printf("Number of rows: %zu\n", numrows);
 
-  CsvParser* parser = csv_new_parser(fd);
-  if (!parser) {
-    fprintf(stderr, "Error creating CSV parser\n");
-    return EXIT_FAILURE;
-  }
+    // Process the rows and fields
+    for (size_t i = 0; i < numrows; i++) {
+        CsvRow* row = rows[i];
+        size_t numfields = row->numFields;
+        printf("Row %zu: ", i);
+        for (size_t j = 0; j < numfields; j++) {
+            printf("%s ", row->fields[j]);
+        }
+        printf("\n");
+    }
 
-  csv_set_skip_header(parser, true);
-
-  // parse the csv data.
-  CsvRow** rows = csv_parse(parser);
-  if (!rows) {
-    fprintf(stderr, "Error parsing CSV file\n");
-    return 1;
-  }
-
-  // get number of rows
-  size_t num_rows = csv_get_numrows(parser);
-  Item items[num_rows];
-  for (size_t i = 0; i < num_rows; i++) {
-    parseItem(rows[i], &items[i]);
-  }
-
-  for (size_t i = 0; i < num_rows; i++) {
-    printf("Item %zu: \"%s\", %zu\n", i + 1, items[i].name, items[i].cash);
-  }
-
-  // pass max_alloc > 0 to read up to max_alloc.
-  // csv_parse_async(parser, handle_row, 0);
-
-  csv_parser_free(parser);
-  return 0;
+    // free the parser and rows
+    // Do not use memory pointed by fields after freeing the parser
+    csvparser_free(parser);
+    return 0;
 }
 
 ```
 
-## Gotchas:
+## License
 
-- Calling csv_parse more than once is not allowed.
-- We have no way to dynamically stop parsing the file without leaking memory.
-- Allocates all the rows dynamically because internal fields have to be dynamically allocated.
+This project is licensed under the MIT License.
 
-If you have any ideas on how to improve this, feel free to send in a PR or file an issue.
+See the [LICENSE](LICENSE) file for details.
+

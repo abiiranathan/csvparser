@@ -6,3 +6,5 @@ test_main
 build
 .cache
 *.o
+output.csv
+large_csv.csv

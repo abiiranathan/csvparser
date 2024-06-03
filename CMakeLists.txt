@@ -5,6 +5,7 @@ include(CTest)
 enable_testing()
 
 add_library(csvparser csvparser.c)
+target_link_libraries(csvparser PUBLIC solidc)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
